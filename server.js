@@ -38,6 +38,7 @@ app.use('/api/logs', require('./src/routes/activityRoutes'));
 app.use('/api/upload', require('./src/routes/uploadRoutes'));
 app.use('/api/delivery-companies', require('./src/routes/deliveryCompanyRoutes'));
 app.use('/api/categories', require('./src/routes/categoryRoutes'));
+app.use('/api/ocr', require('./src/routes/ocrRoutes'));
 
 // Static folder for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
