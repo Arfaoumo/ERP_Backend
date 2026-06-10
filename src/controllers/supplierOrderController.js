@@ -19,8 +19,8 @@ const getOrders = async (req, res, next) => {
 const createOrder = async (req, res, next) => {
   try {
     const { supplier, documentNumber, documentType, parentDocument, products, totalAmount } = req.body;
-    
-    const order = await SupplierOrder.create({
+
+        const order = await SupplierOrder.create({
       supplier,
       documentNumber,
       documentType,
@@ -47,7 +47,6 @@ const updateOrderStatus = async (req, res, next) => {
 
     const { status } = req.body;
 
-    // If marking as RECEIVED, update stock
     if (status === 'Received' && order.status !== 'Received') {
       for (const item of order.products) {
         if (!item.product) continue;
@@ -56,7 +55,6 @@ const updateOrderStatus = async (req, res, next) => {
           product.currentStock += item.quantity;
           await product.save();
 
-          // Log stock movement
           await StockMovement.create({
             product: product._id,
             type: 'IN',

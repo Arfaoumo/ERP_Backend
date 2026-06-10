@@ -7,13 +7,10 @@ const path = require('path');
 const connectDB = require('./src/config/db');
 const { errorHandler } = require('./src/utils/errorHandler');
 
-// Initialize Express app
 const app = express();
 
-// Connect to Database
 connectDB();
 
-// Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
@@ -22,12 +19,10 @@ app.use(helmet({
 }));
 app.use(morgan('dev'));
 
-// Basic Route for testing
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'success', message: 'ERP API is running smoothly.' });
 });
 
-// API Routes
 app.use('/api/auth', require('./src/routes/authRoutes'));
 app.use('/api/products', require('./src/routes/productRoutes'));
 app.use('/api/suppliers', require('./src/routes/supplierRoutes'));
@@ -43,26 +38,21 @@ app.use('/api/alerts', require('./src/routes/alertRoutes'));
 app.use('/api/dashboard', require('./src/routes/dashboardRoutes'));
 app.use('/api/reports', require('./src/routes/reportRoutes'));
 
-// Setup Automated Cron Jobs
 const cron = require('node-cron');
 const { generateMonthlySummary } = require('./src/controllers/reportController');
 
-// Run on the 1st of every month at midnight to summarize the previous month
 cron.schedule('0 0 1 * *', async () => {
   console.log('Running automated monthly financial summary job...');
   const date = new Date();
-  // Generate for previous month
   const targetMonth = date.getMonth() === 0 ? 11 : date.getMonth() - 1;
   const targetYear = date.getMonth() === 0 ? date.getFullYear() - 1 : date.getFullYear();
-  
-  await generateMonthlySummary({ body: { month: targetMonth, year: targetYear } });
+
+    await generateMonthlySummary({ body: { month: targetMonth, year: targetYear } });
   console.log('Automated monthly financial summary completed.');
 });
 
-// Static folder for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Global Error Handler Middleware
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;

@@ -1,8 +1,6 @@
 const Supplier = require('../models/Supplier');
 const { createLog } = require('./activityController');
 
-// @desc    Get all active suppliers
-// @route   GET /api/suppliers
 const getSuppliers = async (req, res, next) => {
   try {
     const suppliers = await Supplier.find({});
@@ -12,8 +10,6 @@ const getSuppliers = async (req, res, next) => {
   }
 };
 
-// @desc    Create a new supplier
-// @route   POST /api/suppliers
 const createSupplier = async (req, res, next) => {
   try {
     const { name, contactName, email, phone, address, vatNumber, products } = req.body;
@@ -34,8 +30,6 @@ const createSupplier = async (req, res, next) => {
   }
 };
 
-// @desc    Update a supplier
-// @route   PUT /api/suppliers/:id
 const updateSupplier = async (req, res, next) => {
   try {
     const supplier = await Supplier.findById(req.params.id);

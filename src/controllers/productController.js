@@ -36,8 +36,8 @@ const updateProduct = async (req, res, next) => {
       product.buyingPrice = buyingPrice !== undefined ? buyingPrice : product.buyingPrice;
       product.minStockThreshold = minStockThreshold || product.minStockThreshold;
       if (isActive !== undefined) product.isActive = isActive;
-      
-      if (imageUrl !== undefined && imageUrl !== product.imageUrl) {
+
+            if (imageUrl !== undefined && imageUrl !== product.imageUrl) {
         if (product.imageUrl && product.imageUrl.startsWith('/uploads')) {
           const oldFilePath = path.join(process.cwd(), product.imageUrl);
           if (fs.existsSync(oldFilePath)) {

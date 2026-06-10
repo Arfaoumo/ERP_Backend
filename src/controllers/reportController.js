@@ -3,12 +3,11 @@ const Sale = require('../models/Sale');
 const SupplierOrder = require('../models/SupplierOrder');
 const { Parser } = require('json2csv');
 
-// 1. Export Data to CSV
 const exportData = async (req, res, next) => {
   try {
-    const { type } = req.params; // 'sales' or 'purchases'
-    
-    let data;
+    const { type } = req.params; 
+
+        let data;
     let fields;
 
     const typeMap = {
@@ -73,7 +72,6 @@ const exportData = async (req, res, next) => {
   }
 };
 
-// 2. Get Historical Reports
 const getReports = async (req, res, next) => {
   try {
     const reports = await FinancialReport.find().sort({ year: -1, month: -1 });
@@ -83,18 +81,16 @@ const getReports = async (req, res, next) => {
   }
 };
 
-// 3. Generate Monthly Summary (Manual Trigger)
 const generateMonthlySummary = async (req, res, next) => {
   try {
-    const { month, year } = req.body; // Expects 0-11 for month, e.g. 5 for June
-    
-    const targetMonth = month !== undefined ? parseInt(month) : new Date().getMonth();
+    const { month, year } = req.body; 
+
+        const targetMonth = month !== undefined ? parseInt(month) : new Date().getMonth();
     const targetYear = year !== undefined ? parseInt(year) : new Date().getFullYear();
 
     const firstDay = new Date(targetYear, targetMonth, 1);
     const lastDay = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
 
-    // Sales Revenue
     const salesData = await Sale.aggregate([
       { $match: { documentType: 'Invoice', paymentStatus: 'Paid', createdAt: { $gte: firstDay, $lte: lastDay } } },
       { $group: { _id: null, totalRevenue: { $sum: "$amountPaid" }, count: { $sum: 1 } } }
@@ -102,7 +98,6 @@ const generateMonthlySummary = async (req, res, next) => {
     const totalRevenue = salesData.length > 0 ? salesData[0].totalRevenue : 0;
     const salesCount = salesData.length > 0 ? salesData[0].count : 0;
 
-    // Purchases Expenses
     const purchasesData = await SupplierOrder.aggregate([
       { $match: { status: { $ne: 'Cancelled' }, createdAt: { $gte: firstDay, $lte: lastDay } } },
       { $group: { _id: null, totalPurchases: { $sum: "$totalAmount" }, count: { $sum: 1 } } }
@@ -115,10 +110,9 @@ const generateMonthlySummary = async (req, res, next) => {
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     const monthName = monthNames[targetMonth];
 
-    // Check if report already exists for this month/year to update it, else create
     let report = await FinancialReport.findOne({ month: monthName, year: targetYear });
-    
-    if (report) {
+
+        if (report) {
       report.totalRevenue = totalRevenue;
       report.totalPurchases = totalPurchases;
       report.profit = profit;
@@ -140,7 +134,7 @@ const generateMonthlySummary = async (req, res, next) => {
     if (res) {
       res.status(201).json(report);
     } else {
-      return report; // Returned for the automated cron job
+      return report; 
     }
 
   } catch (error) {

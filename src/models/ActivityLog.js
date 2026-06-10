@@ -8,14 +8,14 @@ const activityLogSchema = new mongoose.Schema({
   },
   action: { 
     type: String, 
-    required: true // e.g., 'CREATE', 'UPDATE', 'DELETE', 'STOCK_ADJUST'
+    required: true 
   },
   targetType: { 
     type: String, 
-    required: true // e.g., 'Product', 'User', 'Supplier'
+    required: true 
   },
   targetName: {
-    type: String // Name of the product/user/supplier for quick reading
+    type: String 
   },
   details: { 
     type: String 

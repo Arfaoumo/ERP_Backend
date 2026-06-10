@@ -4,32 +4,27 @@ const Customer = require('../models/Customer');
 const StockMovement = require('../models/StockMovement');
 const { createLog } = require('./activityController');
 
-// @desc    Get all sales
-// @route   GET /api/sales
 const getSales = async (req, res, next) => {
   try {
     let sales = await Sale.find({})
       .populate('customer')
       .populate({ path: 'items.product', populate: { path: 'category' } })
       .sort({ createdAt: -1 });
-    
-    // Auto-auditor: Mark Invoices > 30 days old as Overdue
+
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    let needsSave = false;
+
+        let needsSave = false;
     for (let sale of sales) {
       let docNeedsSave = false;
-      
-      // Legacy fallback for remainingBalance
+
       if (sale.remainingBalance === 0 && (sale.paymentStatus === 'Pending' || sale.paymentStatus === 'Partially Paid')) {
         sale.remainingBalance = sale.totalWithTax || sale.totalAmount;
         docNeedsSave = true;
       }
 
       if (sale.documentType === 'Invoice' && sale.remainingBalance > 0) {
-        // Calculate the relevant date for overdue logic
-        let referenceDate = sale.updatedAt; // fallback conversion date roughly
+        let referenceDate = sale.updatedAt; 
         if (sale.payments && sale.payments.length > 0) {
           referenceDate = sale.payments[sale.payments.length - 1].date;
         }
@@ -46,8 +41,8 @@ const getSales = async (req, res, next) => {
         needsSave = true;
       }
     }
-    
-    if (needsSave) {
+
+        if (needsSave) {
       sales = await Sale.find({})
         .populate('customer')
         .populate({ path: 'items.product', populate: { path: 'category' } })
@@ -60,15 +55,13 @@ const getSales = async (req, res, next) => {
   }
 };
 
-// @desc    Get sale by ID
-// @route   GET /api/sales/:id
 const getSaleById = async (req, res, next) => {
   try {
     const sale = await Sale.findById(req.params.id)
       .populate('customer')
       .populate({ path: 'items.product', populate: { path: 'category' } });
-      
-    if (sale) {
+
+          if (sale) {
       res.json(sale);
     } else {
       res.status(404);
@@ -79,8 +72,6 @@ const getSaleById = async (req, res, next) => {
   }
 };
 
-// @desc    Create a new Sales Order (Pending)
-// @route   POST /api/sales
 const createSale = async (req, res, next) => {
   try {
     const { customer, documentNumber, documentType, parentDocument, items, totalAmount, courier } = req.body;
@@ -111,8 +102,6 @@ const createSale = async (req, res, next) => {
   }
 };
 
-// @desc    Update sale status (Trigger Stock OUT)
-// @route   PUT /api/sales/:id/status
 const updateSaleStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
@@ -129,7 +118,6 @@ const updateSaleStatus = async (req, res, next) => {
     }
 
     if (status === 'Shipped') {
-      // Process Stock Reduction
       for (const item of sale.items) {
         const product = await Product.findById(item.product);
         if (product) {
@@ -146,7 +134,6 @@ const updateSaleStatus = async (req, res, next) => {
         }
       }
 
-      // Update Customer total spent ONLY when shipped
       const client = await Customer.findById(sale.customer);
       if (client) {
         client.totalSpent += sale.totalAmount;
@@ -164,8 +151,6 @@ const updateSaleStatus = async (req, res, next) => {
   }
 };
 
-// @desc    Convert Sale document
-// @route   POST /api/sales/:id/convert
 const convertSale = async (req, res, next) => {
   try {
     const parent = await Sale.findById(req.params.id);
@@ -173,8 +158,8 @@ const convertSale = async (req, res, next) => {
 
     let nextType = '';
     let docPrefix = '';
-    
-    if (parent.documentType === 'Quote') { nextType = 'Order'; docPrefix = 'ORD-'; }
+
+        if (parent.documentType === 'Quote') { nextType = 'Order'; docPrefix = 'ORD-'; }
     else if (parent.documentType === 'Order') { nextType = 'DeliveryNote'; docPrefix = 'DLV-'; }
     else if (parent.documentType === 'DeliveryNote') { nextType = 'Invoice'; docPrefix = 'INV-'; }
     else { return res.status(400).json({ message: 'Cannot convert this document further.' }); }
@@ -232,8 +217,6 @@ const convertSale = async (req, res, next) => {
   }
 };
 
-// @desc    Update payment status
-// @route   PUT /api/sales/:id/payment
 const updatePaymentStatus = async (req, res, next) => {
   try {
     const { amount, paymentMethod } = req.body;
@@ -265,8 +248,6 @@ const updatePaymentStatus = async (req, res, next) => {
   }
 };
 
-// @desc    Cancel Quote
-// @route   PUT/PATCH /api/sales/quotes/:id/cancel
 const cancelQuote = async (req, res, next) => {
   try {
     const sale = await Sale.findById(req.params.id);

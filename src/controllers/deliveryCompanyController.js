@@ -1,7 +1,5 @@
 const DeliveryCompany = require('../models/DeliveryCompany');
 
-// @desc    Get all available couriers
-// @route   GET /api/delivery-companies
 const getAvailableCouriers = async (req, res, next) => {
   try {
     const couriers = await DeliveryCompany.find({ isActive: true });
@@ -11,8 +9,6 @@ const getAvailableCouriers = async (req, res, next) => {
   }
 };
 
-// @desc    Get all couriers (Admin)
-// @route   GET /api/delivery-companies/all
 const getAllCouriers = async (req, res, next) => {
   try {
     const couriers = await DeliveryCompany.find({}).sort({ createdAt: -1 });
@@ -22,8 +18,6 @@ const getAllCouriers = async (req, res, next) => {
   }
 };
 
-// @desc    Create a new delivery company (Admin)
-// @route   POST /api/delivery-companies
 const createCourier = async (req, res, next) => {
   try {
     const { name, contactEmail } = req.body;
@@ -39,8 +33,6 @@ const createCourier = async (req, res, next) => {
   }
 };
 
-// @desc    Update a delivery company (Admin)
-// @route   PUT /api/delivery-companies/:id
 const updateCourier = async (req, res, next) => {
   try {
     const { name, contactEmail, isActive } = req.body;
@@ -52,16 +44,14 @@ const updateCourier = async (req, res, next) => {
     if (name) courier.name = name.toUpperCase();
     if (contactEmail) courier.contactEmail = contactEmail.toLowerCase();
     if (isActive !== undefined) courier.isActive = isActive;
-    
-    const updated = await courier.save();
+
+        const updated = await courier.save();
     res.json(updated);
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Toggle delivery company status (Admin)
-// @route   PATCH /api/delivery-companies/:id/toggle
 const toggleCourierStatus = async (req, res, next) => {
   try {
     const { isActive } = req.body;

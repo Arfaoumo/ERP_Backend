@@ -35,8 +35,8 @@ const updateCategory = async (req, res, next) => {
     if (name) category.name = name.toUpperCase();
     if (taxRate !== undefined) category.taxRate = taxRate;
     if (description !== undefined) category.description = description;
-    
-    const updatedCategory = await category.save();
+
+        const updatedCategory = await category.save();
     res.json(updatedCategory);
   } catch (error) {
     next(error);

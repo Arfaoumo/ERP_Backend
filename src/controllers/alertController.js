@@ -8,23 +8,18 @@ const getAlerts = async (req, res, next) => {
     const userRole = req.user.role;
     let alerts = [];
 
-    // Rules mapping
     const canSeeLowStock = ['Admin', 'Employee_Stocks'].includes(userRole);
     const canSeeOverdueInvoices = ['Admin', 'Employee_Commercial', 'Employee_Finance'].includes(userRole);
     const canSeeDelayedSupplierOrders = ['Admin', 'Employee_Achats'].includes(userRole);
     const canSeeIncompleteProfiles = ['Admin', 'Employee_RH'].includes(userRole);
 
-    // 1. Low Stock Alerts
     if (canSeeLowStock) {
-      // Find products where currentStock <= minStockThreshold
-      // In MongoDB we can't directly compare two fields in a simple query easily without $expr, 
-      // but assuming we just fetch them or use $expr.
       const lowStockProducts = await Product.find({
         $expr: { $lte: ['$currentStock', '$minStockThreshold'] },
         isActive: true
       });
-      
-      lowStockProducts.forEach(product => {
+
+            lowStockProducts.forEach(product => {
         alerts.push({
           id: `ls_${product._id}`,
           type: 'LOW_STOCK',
@@ -42,11 +37,10 @@ const getAlerts = async (req, res, next) => {
       });
     }
 
-    // 2. Overdue Invoices (Client)
     if (canSeeOverdueInvoices) {
       const overdueSales = await Sale.find({ paymentStatus: 'Overdue' }).populate('customer', 'name');
-      
-      overdueSales.forEach(sale => {
+
+            overdueSales.forEach(sale => {
         alerts.push({
           id: `oi_${sale._id}`,
           type: 'OVERDUE_PAYMENT',
@@ -63,7 +57,6 @@ const getAlerts = async (req, res, next) => {
       });
     }
 
-    // 3. Delayed Supplier Orders (Achats)
     if (canSeeDelayedSupplierOrders) {
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -90,10 +83,7 @@ const getAlerts = async (req, res, next) => {
       });
     }
 
-    // 4. Incomplete Employee Profiles (RH)
     if (canSeeIncompleteProfiles) {
-      // Users with no avatar or some other missing info. 
-      // We'll check for missing avatarUrl as a simple indicator.
       const incompleteUsers = await User.find({
         $or: [
           { avatarUrl: { $exists: false } },
@@ -119,7 +109,6 @@ const getAlerts = async (req, res, next) => {
       });
     }
 
-    // Sort by urgency or just return as is (we'll just return as is for now)
     res.json(alerts);
 
   } catch (error) {

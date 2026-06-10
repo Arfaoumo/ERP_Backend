@@ -5,7 +5,7 @@ const customerSchema = new mongoose.Schema({
   contactName: { type: String },
   email: { type: String, required: true, unique: true },
   phone: { type: String },
-  address: { type: String }, // Legacy field, can be kept as general
+  address: { type: String }, 
   cin: { type: String },
   shippingAddress: { type: String },
   totalSpent: { type: Number, default: 0 },

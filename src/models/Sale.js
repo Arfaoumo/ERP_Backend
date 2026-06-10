@@ -9,9 +9,9 @@ const saleItemSchema = new mongoose.Schema({
 
 const saleSchema = new mongoose.Schema({
   customer: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
-  documentNumber: { type: String, required: true, unique: true }, // Replaces invoiceNumber to cover Quotes/Orders
+  documentNumber: { type: String, required: true, unique: true }, 
   documentType: { type: String, enum: ['Quote', 'Order', 'DeliveryNote', 'Invoice'], default: 'Quote' },
-  parentDocument: { type: mongoose.Schema.Types.ObjectId, ref: 'Sale', default: null }, // Traces back to Quote/Order
+  parentDocument: { type: mongoose.Schema.Types.ObjectId, ref: 'Sale', default: null }, 
   courier: { type: String, default: 'NONE', uppercase: true },
   items: [saleItemSchema],
   totalAmount: { type: Number, required: true },

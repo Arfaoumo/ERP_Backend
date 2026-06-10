@@ -1,8 +1,6 @@
 const Customer = require('../models/Customer');
 const { createLog } = require('./activityController');
 
-// @desc    Get all customers
-// @route   GET /api/customers
 const getCustomers = async (req, res, next) => {
   try {
     const customers = await Customer.find({});
@@ -12,8 +10,6 @@ const getCustomers = async (req, res, next) => {
   }
 };
 
-// @desc    Create a new customer
-// @route   POST /api/customers
 const createCustomer = async (req, res, next) => {
   try {
     const { name, contactName, email, phone, address, cin, shippingAddress } = req.body;
@@ -35,8 +31,6 @@ const createCustomer = async (req, res, next) => {
   }
 };
 
-// @desc    Update a customer
-// @route   PUT /api/customers/:id
 const updateCustomer = async (req, res, next) => {
   try {
     const customer = await Customer.findById(req.params.id);

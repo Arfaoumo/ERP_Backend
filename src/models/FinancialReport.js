@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 
 const financialReportSchema = new mongoose.Schema({
-  month: { type: String, required: true }, // e.g., 'January'
-  year: { type: Number, required: true },  // e.g., 2026
+  month: { type: String, required: true }, 
+  year: { type: Number, required: true },  
   totalRevenue: { type: Number, default: 0 },
   totalPurchases: { type: Number, default: 0 },
   profit: { type: Number, default: 0 },

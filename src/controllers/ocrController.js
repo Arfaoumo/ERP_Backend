@@ -40,8 +40,6 @@ Rules:
 - Skip non-product rows such as subtotals, tax lines, shipping, rounding, or commentary lines.
 - Trim whitespace and remove currency symbols from numeric fields.`;
 
-// @desc    Extract invoice line items via OpenAI vision, then dedupe against existing products
-// @route   POST /api/ocr/invoice/extract
 const extractInvoice = async (req, res, next) => {
   try {
     if (!req.file) {
@@ -80,7 +78,6 @@ const extractInvoice = async (req, res, next) => {
 
     const rawItems = Array.isArray(parsed.items) ? parsed.items : [];
 
-    // Dedupe candidates: SKU first (case-insensitive), then name (case-insensitive)
     const skus = [...new Set(rawItems.map(i => (i.sku || '').trim()).filter(Boolean))];
     const names = [...new Set(rawItems.map(i => (i.name || '').trim()).filter(Boolean))];
 
@@ -145,8 +142,6 @@ const extractInvoice = async (req, res, next) => {
   }
 };
 
-// @desc    Resolve reviewed OCR items into order line items, batch-creating missing products
-// @route   POST /api/ocr/invoice/resolve
 const resolveItems = async (req, res, next) => {
   try {
     const { supplierId, items } = req.body;
@@ -193,7 +188,6 @@ const resolveItems = async (req, res, next) => {
           throw new Error('New product items require name, sku and categoryId');
         }
 
-        // Race-safe re-check: SKU first, then exact name
         let existing = await Product.findOne({
           sku: new RegExp(`^${escapeRegex(trimmedSku)}$`, 'i')
         });
@@ -241,7 +235,6 @@ const resolveItems = async (req, res, next) => {
       });
     }
 
-    // Link any newly created products to the supplier
     if (newProducts.length > 0) {
       const existingIds = new Set((supplier.products || []).map(id => String(id)));
       for (const p of newProducts) {
@@ -253,7 +246,6 @@ const resolveItems = async (req, res, next) => {
       await supplier.save();
     }
 
-    // Fetch full product docs so the frontend can merge them into its product list
     const allProductIds = resolved.map(r => r.product);
     const products = await Product.find({ _id: { $in: allProductIds } });
 

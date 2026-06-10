@@ -12,7 +12,6 @@ const productsDir = path.join(uploadDir, 'products');
 if (!fs.existsSync(usersDir)) fs.mkdirSync(usersDir, { recursive: true });
 if (!fs.existsSync(productsDir)) fs.mkdirSync(productsDir, { recursive: true });
 
-// Use memory storage to process with sharp before saving
 const storage = multer.memoryStorage();
 
 function checkFileType(file, cb) {
@@ -43,8 +42,7 @@ router.post('/:type', upload.single('image'), async (req, res) => {
     const type = req.params.type;
     const allowedTypes = ['users', 'products'];
     const targetType = allowedTypes.includes(type) ? type : 'others';
-    
-    // Ensure "others" exists just in case
+
     const othersDir = path.join(uploadDir, 'others');
     if (!fs.existsSync(othersDir)) fs.mkdirSync(othersDir, { recursive: true });
 
@@ -52,7 +50,6 @@ router.post('/:type', upload.single('image'), async (req, res) => {
     const filepath = path.join('uploads', targetType, filename);
     const fullPath = path.join(process.cwd(), filepath);
 
-    // Process image: Resize to 800px width (auto height) and convert to WebP
     await sharp(req.file.buffer)
       .resize(800) 
       .webp({ quality: 80 }) 

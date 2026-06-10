@@ -8,7 +8,6 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
 };
 
-// @desc    Auth user & get token
 const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
@@ -34,7 +33,6 @@ const loginUser = async (req, res, next) => {
   }
 };
 
-// @desc    Register a new user
 const registerUser = async (req, res, next) => {
   try {
     const { firstName, lastName, email, password, role, avatarUrl } = req.body;
@@ -66,7 +64,6 @@ const registerUser = async (req, res, next) => {
   }
 };
 
-// @desc    Get user profile
 const getUserProfile = async (req, res, next) => {
   try {
     const user = await User.findById(req.user._id);
@@ -88,7 +85,6 @@ const getUserProfile = async (req, res, next) => {
   }
 };
 
-// @desc    Get all users (RH)
 const getUsers = async (req, res, next) => {
   try {
     const users = await User.find({}).select('-password');
@@ -98,7 +94,6 @@ const getUsers = async (req, res, next) => {
   }
 };
 
-// @desc    Update user
 const updateUser = async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id);
@@ -108,8 +103,7 @@ const updateUser = async (req, res, next) => {
       user.lastName = req.body.lastName || user.lastName;
       user.email = req.body.email || user.email;
       user.role = req.body.role || user.role;
-      
-      // If avatarUrl is explicitly provided and different, delete the old one
+
       if (req.body.avatarUrl !== undefined && req.body.avatarUrl !== user.avatarUrl) {
         if (user.avatarUrl && user.avatarUrl.startsWith('/uploads')) {
           const oldFilePath = path.join(process.cwd(), user.avatarUrl);
@@ -119,8 +113,8 @@ const updateUser = async (req, res, next) => {
         }
         user.avatarUrl = req.body.avatarUrl;
       }
-      
-      if (req.body.password) {
+
+            if (req.body.password) {
         user.password = req.body.password;
       }
 
