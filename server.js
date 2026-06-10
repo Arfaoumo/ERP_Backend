@@ -39,6 +39,25 @@ app.use('/api/upload', require('./src/routes/uploadRoutes'));
 app.use('/api/delivery-companies', require('./src/routes/deliveryCompanyRoutes'));
 app.use('/api/categories', require('./src/routes/categoryRoutes'));
 app.use('/api/ocr', require('./src/routes/ocrRoutes'));
+app.use('/api/alerts', require('./src/routes/alertRoutes'));
+app.use('/api/dashboard', require('./src/routes/dashboardRoutes'));
+app.use('/api/reports', require('./src/routes/reportRoutes'));
+
+// Setup Automated Cron Jobs
+const cron = require('node-cron');
+const { generateMonthlySummary } = require('./src/controllers/reportController');
+
+// Run on the 1st of every month at midnight to summarize the previous month
+cron.schedule('0 0 1 * *', async () => {
+  console.log('Running automated monthly financial summary job...');
+  const date = new Date();
+  // Generate for previous month
+  const targetMonth = date.getMonth() === 0 ? 11 : date.getMonth() - 1;
+  const targetYear = date.getMonth() === 0 ? date.getFullYear() - 1 : date.getFullYear();
+  
+  await generateMonthlySummary({ body: { month: targetMonth, year: targetYear } });
+  console.log('Automated monthly financial summary completed.');
+});
 
 // Static folder for uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

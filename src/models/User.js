@@ -9,7 +9,7 @@ const userSchema = new mongoose.Schema({
   avatarUrl: { type: String },
   role: {
     type: String,
-    enum: ['Admin', 'Employee_Commercial', 'Employee_Stocks', 'Employee_Achats', 'Employee_Finance'],
+    enum: ['Admin', 'Employee_Commercial', 'Employee_Stocks', 'Employee_Achats', 'Employee_Finance', 'Employee_RH'],
     default: 'Employee_Commercial'
   }
 }, { timestamps: true });

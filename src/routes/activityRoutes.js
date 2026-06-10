@@ -3,7 +3,7 @@ const router = express.Router();
 const { getActivityLogs } = require('../controllers/activityController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
-// Only Admins can see system logs
-router.get('/', protect, authorize('Admin'), getActivityLogs);
+// All users can see logs, but controller filters by role
+router.get('/', protect, getActivityLogs);
 
 module.exports = router;
