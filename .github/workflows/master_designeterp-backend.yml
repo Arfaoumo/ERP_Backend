@@ -52,4 +52,4 @@ jobs:
           app-name: 'designeterp-backend'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_8D11ABEAB17B4A23BAC98EDCA32E6241 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_43EF04E048A1489D8CD00B96DE62295F }}
