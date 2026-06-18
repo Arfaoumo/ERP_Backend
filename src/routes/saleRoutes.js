@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { getSales, getSaleById, createSale, updateSaleStatus, convertSale, updatePaymentStatus, cancelQuote } = require('../controllers/saleController');
+const { getSales, getSaleById, createSale, updateSaleStatus, convertSale, updatePaymentStatus, cancelQuote, generateSalePdf } = require('../controllers/saleController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/')
@@ -13,6 +13,9 @@ router.route('/quotes/:id/cancel')
 
 router.route('/:id')
   .get(protect, authorize('Admin', 'Employee_Commercial'), getSaleById);
+
+router.route('/:id/pdf')
+  .get(protect, authorize('Admin', 'Employee_Commercial', 'Employee_Finance', 'Employee_Stocks'), generateSalePdf);
 
 router.route('/:id/cancel')
   .patch(protect, authorize('Admin', 'Employee_Commercial'), cancelQuote)

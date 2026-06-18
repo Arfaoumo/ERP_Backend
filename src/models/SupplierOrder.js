@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 const supplierOrderSchema = mongoose.Schema({
   supplier: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Supplier' },
-  documentNumber: { type: String, required: true, unique: true }, 
+  documentNumber: { type: String, required: true, unique: true, immutable: true }, 
   documentType: { type: String, enum: ['Request', 'Order'], default: 'Request' },
   parentDocument: { type: mongoose.Schema.Types.ObjectId, ref: 'SupplierOrder', default: null },
   products: [

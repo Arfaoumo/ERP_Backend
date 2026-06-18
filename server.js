@@ -7,10 +7,39 @@ const path = require('path');
 const connectDB = require('./src/config/db');
 const { errorHandler } = require('./src/utils/errorHandler');
 
+const i18n = require('i18next');
+const middleware = require('i18next-http-middleware');
+
+i18n.use(middleware.LanguageDetector).init({
+  preload: ['en', 'fr'],
+  fallbackLng: 'en',
+  resources: {
+    en: {
+      translation: {
+        'error.duplicateField': 'Duplicate field value entered. Please use a unique value.',
+        'error.tokenFailed': 'Not authorized, token failed',
+        'error.noToken': 'Not authorized, no token',
+        'error.userNotFound': 'Not authorized, user not found',
+        'error.unauthorized': 'User role is not authorized to access this route'
+      }
+    },
+    fr: {
+      translation: {
+        'error.duplicateField': 'Valeur de champ en double saisie. Veuillez utiliser une valeur unique.',
+        'error.tokenFailed': 'Non autorisé, échec du token',
+        'error.noToken': 'Non autorisé, aucun token fourni',
+        'error.userNotFound': 'Non autorisé, utilisateur non trouvé',
+        'error.unauthorized': 'Le rôle de l\'utilisateur n\'est pas autorisé à accéder à cette route'
+      }
+    }
+  }
+});
+
 const app = express();
 
 connectDB();
 
+app.use(middleware.handle(i18n));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());

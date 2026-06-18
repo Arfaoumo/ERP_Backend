@@ -4,7 +4,7 @@ const errorHandler = (err, req, res, next) => {
 
   if (err.code === 11000) {
     statusCode = 400;
-    message = `Duplicate field value entered. Please use a unique value.`;
+    message = req.t ? req.t('error.duplicateField', { defaultValue: 'Duplicate field value entered. Please use a unique value.' }) : 'Duplicate field value entered. Please use a unique value.';
   }
 
   res.status(statusCode).json({

@@ -4,12 +4,12 @@ const { exportData, getReports, generateMonthlySummary } = require('../controlle
 const { protect, authorize } = require('../middleware/authMiddleware');
 
 router.route('/')
-  .get(protect, authorize('Admin', 'Employee_Commercial', 'Employee_Achats'), getReports);
+  .get(protect, authorize('Admin', 'Employee_Commercial', 'Employee_Achats', 'Employee_Finance'), getReports);
 
 router.route('/export/:type')
-  .get(protect, authorize('Admin', 'Employee_Commercial', 'Employee_Achats'), exportData);
+  .get(protect, authorize('Admin', 'Employee_Commercial', 'Employee_Achats', 'Employee_Finance'), exportData);
 
 router.route('/generate')
-  .post(protect, authorize('Admin'), generateMonthlySummary);
+  .post(protect, authorize('Admin', 'Employee_Finance'), generateMonthlySummary);
 
 module.exports = router;
