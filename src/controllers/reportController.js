@@ -24,7 +24,13 @@ const exportData = async (req, res, next) => {
       'Cancelled': 'Annulé',
       'Approved': 'Approuvé',
       'Shipped': 'Expédié',
-      'Received': 'Reçu'
+      'Received': 'Reçu',
+      'Delivered': 'Livré',
+      'Processed': 'Traité',
+      'Finalized': 'Finalisé',
+      'In Transit': 'En Transit',
+      'Partially Paid': 'Partiellement Payé',
+      'Overdue': 'En Retard'
     };
 
     const paymentMap = {
@@ -61,9 +67,9 @@ const exportData = async (req, res, next) => {
     }
 
     const json2csvParser = new Parser({ fields });
-    const csv = json2csvParser.parse(data);
+    const csv = '\ufeff' + json2csvParser.parse(data);
 
-    res.header('Content-Type', 'text/csv');
+    res.header('Content-Type', 'text/csv; charset=utf-8');
     res.attachment(`${type}_export_${new Date().toISOString().split('T')[0]}.csv`);
     return res.send(csv);
 

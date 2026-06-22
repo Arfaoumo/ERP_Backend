@@ -175,13 +175,45 @@ const convertSale = async (req, res, next) => {
     let nextType = '';
     let docPrefix = '';
 
-        if (parent.documentType === 'Quote') { nextType = 'Order'; docPrefix = 'ORD-'; }
+    if (parent.documentType === 'Quote') { nextType = 'Order'; docPrefix = 'ORD-'; }
     else if (parent.documentType === 'Order') { nextType = 'DeliveryNote'; docPrefix = 'DLV-'; }
     else if (parent.documentType === 'DeliveryNote') { nextType = 'Invoice'; docPrefix = 'INV-'; }
     else { return res.status(400).json({ message: 'Cannot convert this document further.' }); }
 
     const numericPart = parent.documentNumber.includes('-') ? parent.documentNumber.split('-')[1] : Date.now().toString().slice(-6);
     const newDocNumber = `${docPrefix}${numericPart}`;
+
+    if (parent.documentType === 'Order') {
+      // First, check if there's enough stock for all products in the order
+      for (const item of parent.items) {
+        const product = await Product.findById(item.product);
+        if (!product) {
+          res.status(404);
+          throw new Error(`Product not found for item: ${item.product}`);
+        }
+        if (product.currentStock < item.quantity) {
+          res.status(400);
+          throw new Error(`Insufficient stock for product: ${product.name}. Available: ${product.currentStock}, Required: ${item.quantity}`);
+        }
+      }
+
+      // Decrement stock and record movements
+      for (const item of parent.items) {
+        const product = await Product.findById(item.product);
+        if (product) {
+          product.currentStock -= item.quantity;
+          await product.save();
+
+          await StockMovement.create({
+            product: product._id,
+            type: 'OUT',
+            quantity: item.quantity,
+            reason: `Delivery Note #${newDocNumber}`,
+            user: req.user._id
+          });
+        }
+      }
+    }
 
     const newDoc = await Sale.create({
       customer: parent.customer,
@@ -196,8 +228,6 @@ const convertSale = async (req, res, next) => {
       status: nextType === 'DeliveryNote' ? 'In Transit' : 'Pending',
       paymentStatus: 'Pending'
     });
-
-
 
     if (nextType === 'Invoice') {
       const client = await Customer.findById(newDoc.customer);
