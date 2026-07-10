@@ -3,6 +3,8 @@ const Product = require('../models/Product');
 const Customer = require('../models/Customer');
 const StockMovement = require('../models/StockMovement');
 const { createLog } = require('./activityController');
+const { ApiError } = require('../utils/apiError');
+const { runInTransaction } = require('../utils/transaction');
 const PDFDocument = require('pdfkit');
 
 const getSales = async (req, res, next) => {
@@ -128,40 +130,13 @@ const updateSaleStatus = async (req, res, next) => {
       throw new Error('Sale not found');
     }
 
-    if (sale.status === 'Shipped') {
-      res.status(400);
-      throw new Error('Order already shipped');
+    if (status === sale.status) return res.json(sale);
+
+    if (status === 'Shipped') {
+      throw new ApiError(409, 'Shipping is recorded by converting an Order to a Delivery Note.');
     }
 
-    if (status === 'Shipped' && sale.status !== 'Shipped') {
-      for (const item of sale.items) {
-        const product = await Product.findById(item.product);
-        if (product) {
-          product.currentStock -= item.quantity;
-          await product.save();
-
-          await StockMovement.create({
-            product: product._id,
-            type: 'OUT',
-            quantity: item.quantity,
-            reason: `Sales Order #${sale.documentNumber}`,
-            user: req.user._id
-          });
-        }
-      }
-
-      const client = await Customer.findById(sale.customer);
-      if (client) {
-        client.totalSpent += sale.totalAmount;
-        await client.save();
-      }
-    }
-
-    sale.status = status;
-    const updatedSale = await sale.save();
-
-    await createLog(req.user._id, 'UPDATE', 'Sale', sale.documentNumber, `Order status changed to ${status}`);
-    res.json(updatedSale);
+    throw new ApiError(400, 'Manual status transitions are not supported for sales documents.');
   } catch (error) {
     next(error);
   }
@@ -169,84 +144,114 @@ const updateSaleStatus = async (req, res, next) => {
 
 const convertSale = async (req, res, next) => {
   try {
-    const parent = await Sale.findById(req.params.id);
-    if (!parent) return res.status(404).json({ message: 'Document not found' });
+    const result = await runInTransaction(async (session) => {
+      const parent = await Sale.findById(req.params.id).session(session);
+      if (!parent) throw new ApiError(404, 'Document not found');
 
-    let nextType = '';
-    let docPrefix = '';
+      const transitions = {
+        Quote: { nextType: 'Order', prefix: 'ORD-', expectedStatus: 'Pending', parentStatus: 'Processed' },
+        Order: { nextType: 'DeliveryNote', prefix: 'DLV-', expectedStatus: 'Pending', parentStatus: 'Processed' },
+        DeliveryNote: { nextType: 'Invoice', prefix: 'INV-', expectedStatus: 'In Transit', parentStatus: 'Delivered' }
+      };
+      const transition = transitions[parent.documentType];
+      if (!transition) throw new ApiError(400, 'Cannot convert this document further.');
 
-    if (parent.documentType === 'Quote') { nextType = 'Order'; docPrefix = 'ORD-'; }
-    else if (parent.documentType === 'Order') { nextType = 'DeliveryNote'; docPrefix = 'DLV-'; }
-    else if (parent.documentType === 'DeliveryNote') { nextType = 'Invoice'; docPrefix = 'INV-'; }
-    else { return res.status(400).json({ message: 'Cannot convert this document further.' }); }
+      const existing = await Sale.findOne({
+        parentDocument: parent._id,
+        documentType: transition.nextType
+      }).session(session);
+      if (existing) return { document: existing, parentType: parent.documentType, created: false };
 
-    const numericPart = parent.documentNumber.includes('-') ? parent.documentNumber.split('-')[1] : Date.now().toString().slice(-6);
-    const newDocNumber = `${docPrefix}${numericPart}`;
-
-    if (parent.documentType === 'Order') {
-      // First, check if there's enough stock for all products in the order
-      for (const item of parent.items) {
-        const product = await Product.findById(item.product);
-        if (!product) {
-          res.status(404);
-          throw new Error(`Product not found for item: ${item.product}`);
-        }
-        if (product.currentStock < item.quantity) {
-          res.status(400);
-          throw new Error(`Insufficient stock for product: ${product.name}. Available: ${product.currentStock}, Required: ${item.quantity}`);
-        }
+      if (parent.status !== transition.expectedStatus) {
+        throw new ApiError(409, `${parent.documentType} is not in a convertible state.`);
       }
+      if (!parent.items.length) throw new ApiError(400, 'A sales document must contain at least one item.');
 
-      // Decrement stock and record movements
-      for (const item of parent.items) {
-        const product = await Product.findById(item.product);
-        if (product) {
-          product.currentStock -= item.quantity;
-          await product.save();
+      const numericPart = parent.documentNumber.includes('-')
+        ? parent.documentNumber.split('-').slice(1).join('-')
+        : parent._id.toString().slice(-6);
+      const newDocNumber = `${transition.prefix}${numericPart}`;
 
-          await StockMovement.create({
+      if (parent.documentType === 'Order') {
+        const quantitiesByProduct = new Map();
+        for (const item of parent.items) {
+          const quantity = Number(item.quantity);
+          if (!Number.isFinite(quantity) || quantity <= 0) {
+            throw new ApiError(400, 'Order item quantities must be positive numbers.');
+          }
+          const productId = item.product.toString();
+          quantitiesByProduct.set(productId, (quantitiesByProduct.get(productId) || 0) + quantity);
+        }
+
+        for (const [productId, quantity] of quantitiesByProduct) {
+          const product = await Product.findOneAndUpdate(
+            { _id: productId, currentStock: { $gte: quantity } },
+            { $inc: { currentStock: -quantity } },
+            { new: true, session, runValidators: true }
+          );
+          if (!product) {
+            const existingProduct = await Product.findById(productId).session(session);
+            if (!existingProduct) throw new ApiError(404, `Product not found for item: ${productId}`);
+            throw new ApiError(
+              409,
+              `Insufficient stock for product: ${existingProduct.name}. Available: ${existingProduct.currentStock}, Required: ${quantity}`
+            );
+          }
+
+          await StockMovement.create([{
             product: product._id,
             type: 'OUT',
-            quantity: item.quantity,
+            quantity,
             reason: `Delivery Note #${newDocNumber}`,
-            user: req.user._id
-          });
+            user: req.user._id,
+            sourceType: 'Sale',
+            sourceDocument: parent._id
+          }], { session });
         }
       }
-    }
 
-    const newDoc = await Sale.create({
-      customer: parent.customer,
-      documentNumber: newDocNumber,
-      documentType: nextType,
-      parentDocument: parent._id,
-      items: parent.items,
-      totalAmount: parent.totalAmount,
-      taxAmount: parent.taxAmount,
-      totalWithTax: parent.totalWithTax,
-      courier: parent.courier,
-      status: nextType === 'DeliveryNote' ? 'In Transit' : 'Pending',
-      paymentStatus: 'Pending'
+      const [newDoc] = await Sale.create([{
+        customer: parent.customer,
+        documentNumber: newDocNumber,
+        documentType: transition.nextType,
+        parentDocument: parent._id,
+        items: parent.items,
+        totalAmount: parent.totalAmount,
+        taxAmount: parent.taxAmount,
+        totalWithTax: parent.totalWithTax,
+        courier: parent.courier,
+        status: transition.nextType === 'DeliveryNote' ? 'In Transit' : 'Pending',
+        paymentStatus: 'Pending'
+      }], { session });
+
+      if (transition.nextType === 'Invoice') {
+        await Customer.updateOne(
+          { _id: newDoc.customer },
+          { $inc: { totalSpent: newDoc.totalAmount } },
+          { session }
+        );
+      }
+
+      parent.status = transition.parentStatus;
+      await parent.save({ session });
+      return { document: newDoc, parentType: parent.documentType, created: true };
     });
 
-    if (nextType === 'Invoice') {
-      const client = await Customer.findById(newDoc.customer);
-      if (client) {
-        client.totalSpent += newDoc.totalAmount;
-        await client.save();
-      }
+    if (result.created) {
+      await createLog(
+        req.user._id,
+        'CREATE',
+        'Sale',
+        result.document.documentNumber,
+        `Converted ${result.parentType} to ${result.document.documentType}`
+      );
     }
-
-    if (parent.documentType === 'DeliveryNote') {
-      parent.status = 'Delivered';
-    } else {
-      parent.status = 'Processed';
-    }
-    await parent.save();
-
-    await createLog(req.user._id, 'CREATE', 'Sale', newDocNumber, `Converted ${parent.documentType} to ${nextType}`);
-    res.status(201).json(newDoc);
+    res.status(result.created ? 201 : 200).json(result.document);
   } catch (error) {
+    if (error?.code === 11000) {
+      const existing = await Sale.findOne({ parentDocument: req.params.id }).sort({ createdAt: -1 });
+      if (existing) return res.status(200).json(existing);
+    }
     next(error);
   }
 };

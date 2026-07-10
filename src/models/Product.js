@@ -7,8 +7,8 @@ const productSchema = new mongoose.Schema({
   description: { type: String },
   sellingPrice: { type: Number, required: true },
   buyingPrice: { type: Number, required: true },
-  currentStock: { type: Number, default: 0 },
-  minStockThreshold: { type: Number, default: 10 },
+  currentStock: { type: Number, default: 0, min: 0 },
+  minStockThreshold: { type: Number, default: 10, min: 0 },
   imageUrl: { type: String },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });

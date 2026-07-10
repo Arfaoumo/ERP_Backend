@@ -2,6 +2,8 @@ const SupplierOrder = require('../models/SupplierOrder');
 const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
 const { createLog } = require('./activityController');
+const { ApiError } = require('../utils/apiError');
+const { runInTransaction } = require('../utils/transaction');
 
 const getOrders = async (req, res, next) => {
   try {
@@ -40,40 +42,63 @@ const createOrder = async (req, res, next) => {
 
 const updateOrderStatus = async (req, res, next) => {
   try {
-    const order = await SupplierOrder.findById(req.params.id);
-    if (!order) {
-      return res.status(404).json({ message: 'Order not found' });
+    const { status } = req.body;
+    if (!['Received', 'Cancelled'].includes(status)) {
+      throw new ApiError(400, 'Status must be Received or Cancelled.');
     }
 
-    const { status } = req.body;
+    const result = await runInTransaction(async (session) => {
+      const order = await SupplierOrder.findById(req.params.id).session(session);
+      if (!order) throw new ApiError(404, 'Order not found');
+      if (order.status === status) return { order, changed: false };
+      if (order.status !== 'Pending') throw new ApiError(409, 'Only pending purchase orders can change status.');
 
-    if (status === 'Received' && order.status !== 'Received') {
-      for (const item of order.products) {
-        if (!item.product) continue;
-        const product = await Product.findById(item.product);
-        if (product) {
-          product.currentStock += item.quantity;
-          await product.save();
+      if (status === 'Received') {
+        const quantitiesByProduct = new Map();
+        for (const item of order.products) {
+          const quantity = Number(item.quantity);
+          if (!item.product || !Number.isFinite(quantity) || quantity <= 0) {
+            throw new ApiError(400, 'Purchase order items must reference a product and a positive quantity.');
+          }
+          const productId = item.product.toString();
+          quantitiesByProduct.set(productId, (quantitiesByProduct.get(productId) || 0) + quantity);
+        }
 
-          await StockMovement.create({
+        for (const [productId, quantity] of quantitiesByProduct) {
+          const product = await Product.findByIdAndUpdate(
+            productId,
+            { $inc: { currentStock: quantity } },
+            { new: true, session, runValidators: true }
+          );
+          if (!product) throw new ApiError(404, `Product not found for item: ${productId}`);
+
+          await StockMovement.create([{
             product: product._id,
             type: 'IN',
-            quantity: item.quantity,
+            quantity,
             reason: `Reception of PO #${order.documentNumber}`,
-            user: req.user._id
-          });
+            user: req.user._id,
+            sourceType: 'SupplierOrder',
+            sourceDocument: order._id
+          }], { session });
         }
+        order.receivedDate = new Date();
       }
-      order.receivedDate = Date.now();
+
+      order.status = status;
+      await order.save({ session });
+      return { order, changed: true };
+    });
+
+    if (result.changed) {
+      await createLog(req.user._id, 'UPDATE', 'SupplierOrder', result.order.documentNumber, `Status changed to ${status}`);
     }
-
-    order.status = status;
-    await order.save();
-
-    await createLog(req.user._id, 'UPDATE', 'SupplierOrder', order.documentNumber, `Status changed to ${status}`);
-
-    res.json(order);
+    res.json(result.order);
   } catch (error) {
+    if (error?.code === 11000) {
+      const existing = await SupplierOrder.findById(req.params.id);
+      if (existing?.status === 'Received') return res.json(existing);
+    }
     next(error);
   }
 };

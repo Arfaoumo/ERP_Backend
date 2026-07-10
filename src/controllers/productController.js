@@ -3,6 +3,8 @@ const StockMovement = require('../models/StockMovement');
 const fs = require('fs');
 const path = require('path');
 const { createLog } = require('./activityController');
+const { ApiError } = require('../utils/apiError');
+const { runInTransaction } = require('../utils/transaction');
 
 const getProducts = async (req, res, next) => {
   try {
@@ -63,33 +65,38 @@ const adjustStock = async (req, res, next) => {
   try {
     const { type, quantity, reason } = req.body;
     const productId = req.params.id;
-
-    const product = await Product.findById(productId);
-    if (!product) {
-      res.status(404);
-      throw new Error('Product not found');
-    }
-
     const qty = Number(quantity);
-    if (type === 'OUT' && product.currentStock < qty) {
-      res.status(400);
-      throw new Error('Insufficient stock');
-    }
+    if (!['IN', 'OUT'].includes(type)) throw new ApiError(400, 'Stock movement type must be IN or OUT.');
+    if (!Number.isFinite(qty) || qty <= 0) throw new ApiError(400, 'Quantity must be a positive number.');
+    if (typeof reason !== 'string' || !reason.trim()) throw new ApiError(400, 'Reason is required.');
 
-    product.currentStock = type === 'IN' ? product.currentStock + qty : product.currentStock - qty;
-    await product.save();
+    const result = await runInTransaction(async (session) => {
+      const filter = { _id: productId };
+      if (type === 'OUT') filter.currentStock = { $gte: qty };
+      const product = await Product.findOneAndUpdate(
+        filter,
+        { $inc: { currentStock: type === 'IN' ? qty : -qty } },
+        { new: true, session, runValidators: true }
+      );
+      if (!product) {
+        const exists = await Product.exists({ _id: productId }).session(session);
+        if (!exists) throw new ApiError(404, 'Product not found');
+        throw new ApiError(409, 'Insufficient stock');
+      }
 
-    const movement = await StockMovement.create({
-      product: productId,
-      type,
-      quantity: qty,
-      reason,
-      user: req.user._id
+      const [movement] = await StockMovement.create([{
+        product: productId,
+        type,
+        quantity: qty,
+        reason: reason.trim(),
+        user: req.user._id
+      }], { session });
+      return { product, movement };
     });
 
-    await createLog(req.user._id, 'STOCK_ADJUST', 'Product', product.name, `${type} adjustment: ${qty} units. Reason: ${reason}`);
+    await createLog(req.user._id, 'STOCK_ADJUST', 'Product', result.product.name, `${type} adjustment: ${qty} units. Reason: ${reason.trim()}`);
 
-    res.status(201).json({ product, movement });
+    res.status(201).json(result);
   } catch (error) {
     next(error);
   }

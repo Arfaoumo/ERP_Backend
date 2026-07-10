@@ -29,6 +29,14 @@ const saleSchema = new mongoose.Schema({
   paymentStatus: { type: String, enum: ['Paid', 'Pending', 'Overdue', 'Partially Paid'], default: 'Pending' }
 }, { timestamps: true });
 
+saleSchema.index(
+  { parentDocument: 1, documentType: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { parentDocument: { $type: 'objectId' } }
+  }
+);
+
 saleSchema.pre('save', function(next) {
   if (this.isNew || this.isModified('totalWithTax') || this.isModified('amountPaid')) {
     this.remainingBalance = Number((this.totalWithTax - this.amountPaid).toFixed(2));
