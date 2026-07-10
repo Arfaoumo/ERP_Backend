@@ -1,10 +1,9 @@
 const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
-const fs = require('fs');
-const path = require('path');
 const { createLog } = require('./activityController');
 const { ApiError } = require('../utils/apiError');
 const { runInTransaction } = require('../utils/transaction');
+const { deleteLocalUpload } = require('../utils/files');
 
 const getProducts = async (req, res, next) => {
   try {
@@ -17,7 +16,17 @@ const getProducts = async (req, res, next) => {
 
 const createProduct = async (req, res, next) => {
   try {
-    const product = new Product(req.body);
+    const product = new Product({
+      name: req.body.name,
+      sku: req.body.sku,
+      category: req.body.category,
+      description: req.body.description,
+      sellingPrice: req.body.sellingPrice,
+      buyingPrice: req.body.buyingPrice,
+      minStockThreshold: req.body.minStockThreshold,
+      imageUrl: req.body.imageUrl,
+      isActive: req.body.isActive
+    });
     const createdProduct = await product.save();
     await createLog(req.user._id, 'CREATE', 'Product', createdProduct.name, `New product created with SKU: ${createdProduct.sku}`);
     res.status(201).json(createdProduct);
@@ -32,6 +41,7 @@ const updateProduct = async (req, res, next) => {
     const product = await Product.findById(req.params.id);
 
     if (product) {
+      let oldImageUrl = null;
       product.name = name || product.name;
       product.description = description || product.description;
       product.sellingPrice = sellingPrice || product.sellingPrice;
@@ -40,16 +50,12 @@ const updateProduct = async (req, res, next) => {
       if (isActive !== undefined) product.isActive = isActive;
 
             if (imageUrl !== undefined && imageUrl !== product.imageUrl) {
-        if (product.imageUrl && product.imageUrl.startsWith('/uploads')) {
-          const oldFilePath = path.join(process.cwd(), product.imageUrl);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-          }
-        }
+        oldImageUrl = product.imageUrl;
         product.imageUrl = imageUrl;
       }
 
       const updatedProduct = await product.save();
+      await deleteLocalUpload(oldImageUrl);
       await createLog(req.user._id, 'UPDATE', 'Product', updatedProduct.name, 'Product details updated');
       res.json(updatedProduct);
     } else {

@@ -1,17 +1,17 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
-const fs = require('fs');
-const path = require('path');
 const { createLog } = require('./activityController');
+const { ApiError } = require('../utils/apiError');
+const { deleteLocalUpload } = require('../utils/files');
 
 const generateToken = (id) => {
-  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '30d' });
+  return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN || '30d' });
 };
 
 const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email, isActive: true }).select('+password');
 
     if (user && (await user.matchPassword(password))) {
       await createLog(user._id, 'LOGIN', 'User', `${user.firstName} ${user.lastName}`, 'User successfully logged into the system');
@@ -35,7 +35,10 @@ const loginUser = async (req, res, next) => {
 
 const registerUser = async (req, res, next) => {
   try {
-    const { firstName, lastName, email, password, role, avatarUrl } = req.body;
+    const { firstName, lastName, email, password, role, avatarUrl, isActive } = req.body;
+    if (req.user.role !== 'Admin' && role === 'Admin') {
+      throw new ApiError(403, 'Only an Admin can assign the Admin role.');
+    }
     const userExists = await User.findOne({ email });
 
     if (userExists) {
@@ -43,7 +46,7 @@ const registerUser = async (req, res, next) => {
       throw new Error('User already exists');
     }
 
-    const user = await User.create({ firstName, lastName, email, password, role, avatarUrl });
+    const user = await User.create({ firstName, lastName, email, password, role, avatarUrl, isActive });
 
     if (user) {
       await createLog(req.user._id, 'CREATE', 'User', `${user.firstName} ${user.lastName}`, `Registered as ${user.role}`);
@@ -53,7 +56,8 @@ const registerUser = async (req, res, next) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        avatarUrl: user.avatarUrl
+        avatarUrl: user.avatarUrl,
+        isActive: user.isActive
       });
     } else {
       res.status(400);
@@ -74,7 +78,8 @@ const getUserProfile = async (req, res, next) => {
         lastName: user.lastName,
         email: user.email,
         role: user.role,
-        avatarUrl: user.avatarUrl
+        avatarUrl: user.avatarUrl,
+        isActive: user.isActive
       });
     } else {
       res.status(404);
@@ -99,18 +104,21 @@ const updateUser = async (req, res, next) => {
     const user = await User.findById(req.params.id);
 
     if (user) {
+      let oldAvatarUrl = null;
+      if (req.user.role !== 'Admin' && user.role === 'Admin') {
+        throw new ApiError(403, 'Only an Admin can modify an Admin account.');
+      }
+      if (req.user.role !== 'Admin' && req.body.role === 'Admin') {
+        throw new ApiError(403, 'Only an Admin can assign the Admin role.');
+      }
       user.firstName = req.body.firstName || user.firstName;
       user.lastName = req.body.lastName || user.lastName;
       user.email = req.body.email || user.email;
       user.role = req.body.role || user.role;
+      if (req.body.isActive !== undefined) user.isActive = req.body.isActive;
 
       if (req.body.avatarUrl !== undefined && req.body.avatarUrl !== user.avatarUrl) {
-        if (user.avatarUrl && user.avatarUrl.startsWith('/uploads')) {
-          const oldFilePath = path.join(process.cwd(), user.avatarUrl);
-          if (fs.existsSync(oldFilePath)) {
-            fs.unlinkSync(oldFilePath);
-          }
-        }
+        oldAvatarUrl = user.avatarUrl;
         user.avatarUrl = req.body.avatarUrl;
       }
 
@@ -119,6 +127,7 @@ const updateUser = async (req, res, next) => {
       }
 
       const updatedUser = await user.save();
+      await deleteLocalUpload(oldAvatarUrl);
 
       await createLog(req.user._id, 'UPDATE', 'User', `${updatedUser.firstName} ${updatedUser.lastName}`, 'User profile/permissions updated');
 
@@ -128,7 +137,8 @@ const updateUser = async (req, res, next) => {
         lastName: updatedUser.lastName,
         email: updatedUser.email,
         role: updatedUser.role,
-        avatarUrl: updatedUser.avatarUrl
+        avatarUrl: updatedUser.avatarUrl,
+        isActive: updatedUser.isActive
       });
     } else {
       res.status(404);

@@ -8,13 +8,13 @@ const supplierOrderSchema = mongoose.Schema({
   products: [
     {
       product: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'Product' },
-      quantity: { type: Number, required: true },
-      buyingPrice: { type: Number, required: true }
+      quantity: { type: Number, required: true, min: 0.000001 },
+      buyingPrice: { type: Number, required: true, min: 0 }
     }
   ],
   status: { type: String, required: true, enum: ['Pending', 'Received', 'Cancelled'], default: 'Pending' },
   paymentStatus: { type: String, enum: ['Unpaid', 'Partial', 'Paid'], default: 'Unpaid' },
-  totalAmount: { type: Number, required: true, default: 0.0 },
+  totalAmount: { type: Number, required: true, default: 0.0, min: 0 },
   orderedBy: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
   receivedDate: { type: Date }
 }, {

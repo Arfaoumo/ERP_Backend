@@ -2,9 +2,9 @@ const mongoose = require('mongoose');
 
 const saleItemSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
-  quantity: { type: Number, required: true },
-  sellingPrice: { type: Number, required: true },
-  subtotal: { type: Number, required: true }
+  quantity: { type: Number, required: true, min: 0.000001 },
+  sellingPrice: { type: Number, required: true, min: 0 },
+  subtotal: { type: Number, required: true, min: 0 }
 });
 
 const saleSchema = new mongoose.Schema({

@@ -1,6 +1,7 @@
 const SupplierOrder = require('../models/SupplierOrder');
 const Product = require('../models/Product');
 const StockMovement = require('../models/StockMovement');
+const Supplier = require('../models/Supplier');
 const { createLog } = require('./activityController');
 const { ApiError } = require('../utils/apiError');
 const { runInTransaction } = require('../utils/transaction');
@@ -20,14 +21,32 @@ const getOrders = async (req, res, next) => {
 
 const createOrder = async (req, res, next) => {
   try {
-    const { supplier, documentNumber, documentType, parentDocument, products, totalAmount } = req.body;
+    const { supplier, documentNumber, documentType, parentDocument, products } = req.body;
+    const supplierExists = await Supplier.exists({ _id: supplier, isActive: true });
+    if (!supplierExists) throw new ApiError(404, 'Active supplier not found.');
 
-        const order = await SupplierOrder.create({
+    const productIds = [...new Set(products.map((item) => item.product))];
+    const databaseProducts = await Product.find({ _id: { $in: productIds }, isActive: true });
+    const byId = new Map(databaseProducts.map((product) => [product._id.toString(), product]));
+    const safeProducts = products.map((item) => {
+      const product = byId.get(item.product);
+      if (!product) throw new ApiError(404, `Active product not found: ${item.product}`);
+      return {
+        product: product._id,
+        quantity: Number(item.quantity),
+        buyingPrice: Number(product.buyingPrice)
+      };
+    });
+    const totalAmount = Number(safeProducts.reduce(
+      (total, item) => total + (item.quantity * item.buyingPrice), 0
+    ).toFixed(2));
+
+    const order = await SupplierOrder.create({
       supplier,
       documentNumber,
       documentType,
       parentDocument,
-      products,
+      products: safeProducts,
       totalAmount,
       orderedBy: req.user._id
     });

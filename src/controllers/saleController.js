@@ -40,13 +40,15 @@ const getSaleById = async (req, res, next) => {
 const createSale = async (req, res, next) => {
   try {
     const { customer, documentNumber, documentType, parentDocument, items, courier } = req.body;
+    const customerExists = await Customer.exists({ _id: customer, isActive: true });
+    if (!customerExists) throw new ApiError(404, 'Active customer not found.');
 
     let calculatedTotalAmount = 0;
     let calculatedTaxAmount = 0;
 
     if (items && items.length > 0) {
       for (const item of items) {
-        const product = await Product.findById(item.product).populate('category');
+        const product = await Product.findOne({ _id: item.product, isActive: true }).populate('category');
         if (!product) {
           res.status(404);
           throw new Error(`Product not found for ID: ${item.product}`);

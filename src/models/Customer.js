@@ -8,7 +8,7 @@ const customerSchema = new mongoose.Schema({
   address: { type: String }, 
   cin: { type: String },
   shippingAddress: { type: String },
-  totalSpent: { type: Number, default: 0 },
+  totalSpent: { type: Number, default: 0, min: 0 },
   isActive: { type: Boolean, default: true }
 }, { timestamps: true });
 

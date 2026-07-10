@@ -1,64 +1,58 @@
 const express = require('express');
-const router = express.Router();
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 const sharp = require('sharp');
+const { protect } = require('../middleware/authMiddleware');
+const { ApiError } = require('../utils/apiError');
 
+const router = express.Router();
 const uploadDir = path.join(process.cwd(), 'uploads');
-const usersDir = path.join(uploadDir, 'users');
-const productsDir = path.join(uploadDir, 'products');
+const allowedRoles = {
+  users: ['Admin', 'Employee_RH'],
+  products: ['Admin', 'Employee_Stocks', 'Employee_Achats']
+};
+const allowedMimeTypes = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const allowedExtensions = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
-if (!fs.existsSync(usersDir)) fs.mkdirSync(usersDir, { recursive: true });
-if (!fs.existsSync(productsDir)) fs.mkdirSync(productsDir, { recursive: true });
-
-const storage = multer.memoryStorage();
-
-function checkFileType(file, cb) {
-  const filetypes = /jpg|jpeg|png|webp/;
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = filetypes.test(file.mimetype);
-
-  if (extname && mimetype) {
-    return cb(null, true);
-  } else {
-    cb('Images only!');
-  }
-}
+const authorizeUpload = (req, res, next) => {
+  const roles = allowedRoles[req.params.type];
+  if (!roles) return next(new ApiError(400, 'Unsupported upload type.'));
+  if (!roles.includes(req.user.role)) return next(new ApiError(403, 'User role is not authorized for this upload type.'));
+  next();
+};
 
 const upload = multer({
-  storage,
-  fileFilter: function (req, file, cb) {
-    checkFileType(file, cb);
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter(req, file, callback) {
+    const extension = path.extname(file.originalname || '').toLowerCase();
+    if (!allowedMimeTypes.has(file.mimetype) || !allowedExtensions.has(extension)) {
+      return callback(new ApiError(400, 'Only JPG, PNG, and WEBP images are allowed.'));
+    }
+    callback(null, true);
   }
 });
 
-router.post('/:type', upload.single('image'), async (req, res) => {
+router.post('/:type', protect, authorizeUpload, upload.single('image'), async (req, res, next) => {
   try {
-    if (!req.file) {
-      return res.status(400).send('No file uploaded');
-    }
+    if (!req.file) throw new ApiError(400, 'No image was uploaded.');
 
-    const type = req.params.type;
-    const allowedTypes = ['users', 'products'];
-    const targetType = allowedTypes.includes(type) ? type : 'others';
+    const targetDir = path.join(uploadDir, req.params.type);
+    await fs.promises.mkdir(targetDir, { recursive: true });
+    const filename = `${crypto.randomUUID()}.webp`;
+    const fullPath = path.join(targetDir, filename);
 
-    const othersDir = path.join(uploadDir, 'others');
-    if (!fs.existsSync(othersDir)) fs.mkdirSync(othersDir, { recursive: true });
-
-    const filename = `${req.file.fieldname}-${Date.now()}.webp`;
-    const filepath = path.join('uploads', targetType, filename);
-    const fullPath = path.join(process.cwd(), filepath);
-
-    await sharp(req.file.buffer)
-      .resize(800) 
-      .webp({ quality: 80 }) 
+    await sharp(req.file.buffer, { limitInputPixels: 40_000_000 })
+      .rotate()
+      .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
+      .webp({ quality: 80 })
       .toFile(fullPath);
 
-    res.send(`/${filepath.replace(/\\/g, '/')}`);
+    res.status(201).send(`/uploads/${req.params.type}/${filename}`);
   } catch (error) {
-    console.error('Image processing error:', error);
-    res.status(500).send('Error processing image');
+    next(error);
   }
 });
 
