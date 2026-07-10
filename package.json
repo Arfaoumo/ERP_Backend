@@ -8,7 +8,8 @@
     "dev": "nodemon server.js",
     "test": "jest --runInBand",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage --runInBand"
+    "test:coverage": "jest --coverage --runInBand",
+    "test:startup": "node test/startup-smoke.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

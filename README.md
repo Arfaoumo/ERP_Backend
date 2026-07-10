@@ -101,6 +101,7 @@ Health check: `GET http://localhost:5000/api/health`.
 npm test
 npm run test:watch
 npm run test:coverage
+npm run test:startup
 ```
 
 Tests start an isolated in-memory MongoDB replica set and never use `.env` database data. The suite covers authentication, authorization, lifecycle conversions, database prices, stock integrity, idempotency, payments, receiving, and error contracts.
