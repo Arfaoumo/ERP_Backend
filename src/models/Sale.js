@@ -14,13 +14,13 @@ const saleSchema = new mongoose.Schema({
   parentDocument: { type: mongoose.Schema.Types.ObjectId, ref: 'Sale', default: null }, 
   courier: { type: String, default: 'NONE', uppercase: true },
   items: [saleItemSchema],
-  totalAmount: { type: Number, required: true },
-  taxAmount: { type: Number, default: 0 },
-  totalWithTax: { type: Number, default: 0 },
-  amountPaid: { type: Number, default: 0 },
-  remainingBalance: { type: Number, default: 0 },
+  totalAmount: { type: Number, required: true, min: 0 },
+  taxAmount: { type: Number, default: 0, min: 0 },
+  totalWithTax: { type: Number, default: 0, min: 0 },
+  amountPaid: { type: Number, default: 0, min: 0 },
+  remainingBalance: { type: Number, default: 0, min: 0 },
   payments: [{
-    amount: { type: Number, required: true },
+    amount: { type: Number, required: true, min: 0.01 },
     paymentMethod: { type: String, enum: ['Cash', 'Check'], required: true },
     checkStatus: { type: String, enum: ['Pending', 'Cleared', 'Bounced', 'None'], default: 'None' },
     date: { type: Date, default: Date.now }
@@ -39,7 +39,8 @@ saleSchema.index(
 
 saleSchema.pre('save', function(next) {
   if (this.isNew || this.isModified('totalWithTax') || this.isModified('amountPaid')) {
-    this.remainingBalance = Number((this.totalWithTax - this.amountPaid).toFixed(2));
+    const total = this.totalWithTax > 0 ? this.totalWithTax : this.totalAmount;
+    this.remainingBalance = Math.max(0, Number((total - this.amountPaid).toFixed(2)));
   }
   next();
 });

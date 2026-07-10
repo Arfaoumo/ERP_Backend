@@ -5,6 +5,7 @@ const StockMovement = require('../models/StockMovement');
 const { createLog } = require('./activityController');
 const { ApiError } = require('../utils/apiError');
 const { runInTransaction } = require('../utils/transaction');
+const { roundMoney } = require('../utils/money');
 const PDFDocument = require('pdfkit');
 
 const getSales = async (req, res, next) => {
@@ -259,28 +260,57 @@ const convertSale = async (req, res, next) => {
 const updatePaymentStatus = async (req, res, next) => {
   try {
     const { amount, paymentMethod } = req.body;
-    const sale = await Sale.findById(req.params.id);
-    if (!sale) return res.status(404).json({ message: 'Sale not found' });
+    const numericAmount = Number(amount);
+    const roundedAmount = roundMoney(numericAmount);
+    const allowedMethods = ['Cash', 'Check'];
 
-    if (amount) {
-      sale.payments.push({ amount, paymentMethod, date: new Date() });
-      sale.amountPaid += Number(amount);
-      sale.remainingBalance = (sale.totalWithTax || sale.totalAmount) - sale.amountPaid;
+    if (!Number.isFinite(numericAmount) || roundedAmount <= 0) {
+      throw new ApiError(400, 'Payment amount must be a finite number greater than zero.');
+    }
+    if (!allowedMethods.includes(paymentMethod)) {
+      throw new ApiError(400, 'Payment method must be Cash or Check.');
     }
 
-    if (sale.remainingBalance <= 0) {
-      sale.paymentStatus = 'Paid';
-      sale.status = 'Finalized';
-    } else if (sale.amountPaid > 0) {
-      sale.paymentStatus = 'Partially Paid';
-      sale.status = 'Partially Paid';
-    } else {
-      sale.paymentStatus = 'Pending';
-    }
+    const sale = await runInTransaction(async (session) => {
+      const invoice = await Sale.findById(req.params.id).session(session);
+      if (!invoice) throw new ApiError(404, 'Sale not found');
+      if (invoice.documentType !== 'Invoice') {
+        throw new ApiError(400, 'Payments can only be recorded against invoices.');
+      }
+      if (invoice.status === 'Cancelled') {
+        throw new ApiError(409, 'Cancelled invoices cannot receive payments.');
+      }
+      if (invoice.paymentStatus === 'Paid' || invoice.status === 'Finalized') {
+        throw new ApiError(409, 'This invoice is already fully paid.');
+      }
 
-    await sale.save();
+      const total = roundMoney(invoice.totalWithTax || invoice.totalAmount);
+      const amountPaid = roundMoney(invoice.amountPaid || 0);
+      const remaining = roundMoney(total - amountPaid);
+      if (remaining <= 0) throw new ApiError(409, 'This invoice has no remaining balance.');
+      if (roundedAmount > remaining) {
+        throw new ApiError(409, `Payment exceeds the remaining balance of ${remaining.toFixed(2)}.`);
+      }
 
-    await createLog(req.user._id, 'UPDATE', 'Sale', sale.documentNumber, `Payment of ${amount} recorded via ${paymentMethod}. Status: ${sale.paymentStatus}`);
+      const newAmountPaid = roundMoney(amountPaid + roundedAmount);
+      const newRemaining = roundMoney(total - newAmountPaid);
+      invoice.payments.push({ amount: roundedAmount, paymentMethod, date: new Date() });
+      invoice.amountPaid = newAmountPaid;
+      invoice.remainingBalance = newRemaining;
+
+      if (newRemaining === 0) {
+        invoice.paymentStatus = 'Paid';
+        invoice.status = 'Finalized';
+      } else {
+        invoice.paymentStatus = 'Partially Paid';
+        invoice.status = 'Partially Paid';
+      }
+
+      await invoice.save({ session });
+      return invoice;
+    });
+
+    await createLog(req.user._id, 'UPDATE', 'Sale', sale.documentNumber, `Payment of ${roundedAmount.toFixed(2)} recorded via ${paymentMethod}. Status: ${sale.paymentStatus}`);
     res.json(sale);
   } catch (error) {
     next(error);
