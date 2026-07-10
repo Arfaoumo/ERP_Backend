@@ -6,7 +6,7 @@ Frontend baseline: `b4d517d`
 
 ## 1. Executive summary
 
-The two repositories were pulled before inspection and were already current. The frontend workflow was traced before changing backend business rules. The audit confirmed that the normal UI treats Order -> Delivery Note as dispatch, while a legacy backend Shipped endpoint and non-idempotent conversion path could independently deduct the same stock.
+The project was created for a second-year IUT Annecy Informatique internship, Parcours A, with Designet Web Agency, and is now prepared as a recruiter-facing portfolio project. The two repositories were pulled before inspection and were already current. The frontend workflow was traced before changing backend business rules. The audit confirmed that the normal UI treats Order -> Delivery Note as dispatch, while a legacy backend Shipped endpoint and non-idempotent conversion path could independently deduct the same stock.
 
 The repair preserves the existing MERN/CommonJS architecture and visual design. It makes the critical inventory, document-conversion, purchase-receipt, manual-adjustment, and payment operations transactional; enforces lifecycle and validation rules; removes writes from sales GET requests; improves authentication, authorization, CORS, uploads, errors, and dependency security; adds isolated integration tests; restores a clean frontend lint/build baseline; and replaces template documentation with setup/security guides.
 

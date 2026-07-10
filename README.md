@@ -1,8 +1,12 @@
 # Designet ERP Backend
 
-Express and MongoDB API for a student MERN ERP portfolio project. It supports role-based sales, purchasing, inventory, customer/supplier management, reports, uploads, PDF generation, and optional invoice OCR.
+Express and MongoDB API for a student MERN ERP portfolio project developed during a second-year IUT Annecy Informatique internship, Parcours A, with Designet Web Agency. It supports role-based sales, purchasing, inventory, customer/supplier management, reports, uploads, PDF generation, and optional invoice OCR.
 
 This repository is suitable for development and portfolio demonstrations. It is not presented as a proven production service or as software used by real customers.
+
+## Project context
+
+This project was created as part of a second-year IUT Annecy Informatique internship, Parcours A, with Designet Web Agency. It is presented as a portfolio and learning project showing full-stack ERP workflows and production-readiness improvements.
 
 ## Architecture
 
