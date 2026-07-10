@@ -69,6 +69,16 @@ app.use('/api/reports', require('./src/routes/reportRoutes'));
 
 const cron = require('node-cron');
 const { generateMonthlySummary } = require('./src/controllers/reportController');
+const { processOverdueInvoices } = require('./src/services/overdueService');
+
+cron.schedule('5 0 * * *', async () => {
+  try {
+    const result = await processOverdueInvoices();
+    console.log(`Overdue invoice job completed: ${result.modifiedCount} invoice(s) updated.`);
+  } catch (error) {
+    console.error('Overdue invoice job failed:', error.message);
+  }
+});
 
 cron.schedule('0 0 1 * *', async () => {
   console.log('Running automated monthly financial summary job...');

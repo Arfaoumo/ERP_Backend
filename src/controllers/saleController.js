@@ -10,49 +10,10 @@ const PDFDocument = require('pdfkit');
 
 const getSales = async (req, res, next) => {
   try {
-    let sales = await Sale.find({})
+    const sales = await Sale.find({})
       .populate('customer')
       .populate({ path: 'items.product', populate: { path: 'category' } })
       .sort({ createdAt: -1 });
-
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        let needsSave = false;
-    for (let sale of sales) {
-      let docNeedsSave = false;
-
-      if (sale.remainingBalance === 0 && (sale.paymentStatus === 'Pending' || sale.paymentStatus === 'Partially Paid')) {
-        sale.remainingBalance = sale.totalWithTax || sale.totalAmount;
-        docNeedsSave = true;
-      }
-
-      if (sale.documentType === 'Invoice' && sale.remainingBalance > 0) {
-        let referenceDate = sale.updatedAt; 
-        if (sale.payments && sale.payments.length > 0) {
-          referenceDate = sale.payments[sale.payments.length - 1].date;
-        }
-
-        if (referenceDate < thirtyDaysAgo && (sale.paymentStatus !== 'Overdue' || sale.status !== 'Overdue')) {
-          sale.paymentStatus = 'Overdue';
-          sale.status = 'Overdue';
-          docNeedsSave = true;
-        }
-      }
-
-      if (docNeedsSave) {
-        await sale.save();
-        needsSave = true;
-      }
-    }
-
-        if (needsSave) {
-      sales = await Sale.find({})
-        .populate('customer')
-        .populate({ path: 'items.product', populate: { path: 'category' } })
-        .sort({ createdAt: -1 });
-    }
-
     res.json(sales);
   } catch (error) {
     next(error);
