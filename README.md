@@ -2,8 +2,6 @@
 
 API REST d’un ERP développé avec **Node.js, Express et MongoDB**. Elle centralise les workflows de vente, d’achat, de stock, de paiement et d’administration utilisés par le [frontend React](https://github.com/Arfaoumo/ERP_Frontend).
 
-> Ce dépôt présente un projet de stage et de portfolio. Il ne prétend pas être un service de production exploité par des clients réels.
-
 ## Contexte du projet
 
 Ce backend a été réalisé pendant mon stage de deuxième année de BUT Informatique au sein de **Designet Web Agency**. L’objectif était de concevoir un ERP sur mesure afin de numériser et regrouper les principaux processus internes d’une entreprise : gestion commerciale, achats, stocks, utilisateurs et pilotage de l’activité.
